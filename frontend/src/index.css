@@ -32,24 +32,31 @@
 }
 
 /* ── Base ─────────────────────────────────────────── */
+/* Kept inside @layer base: unlayered rules would override Tailwind utilities
+   (e.g. a global `* { padding: 0 }` silently disables every p-* class). */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+  }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
+  a {
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* ── Scrollbar ───────────────────────────────────── */
@@ -76,18 +83,6 @@ body {
 
 ::selection {
   background-color: rgba(255, 255, 255, 0.15);
-  color: var(--color-text-accent);
-}
-
-/* ── Links ───────────────────────────────────────── */
-
-a {
-  color: var(--color-text-primary);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-a:hover {
   color: var(--color-text-accent);
 }
 
