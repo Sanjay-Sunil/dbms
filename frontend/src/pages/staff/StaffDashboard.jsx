@@ -52,11 +52,12 @@ export default function StaffDashboard() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessionDetail, setSelectedSessionDetail] = useState(null);
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
-  const [newSessionData, setNewSessionData] = useState({
-    session_date: new Date().toISOString().split('T')[0],
+  const [newSessionData, setNewSessionData] = useState(() => ({
+    // Local calendar date; toISOString() is UTC and gives yesterday before 05:30 IST.
+    session_date: new Date().toLocaleDateString('en-CA'),
     meal_type: 'LUNCH',
     notes: '',
-  });
+  }));
 
   // Students list for lookup
   const [studentsList, setStudentsList] = useState([]);
@@ -283,6 +284,8 @@ export default function StaffDashboard() {
         amount_due: price,
         payment_status: 'PAID',
       });
+      const student = studentsList.find((st) => String(st.id) === String(studentId));
+      toast.success(`${student?.full_name || 'Student'} marked served.`);
       loadSessionDetail(selectedSessionId);
     } catch (err) {
       toast.error(errorMessage(err, 'Already recorded or error occurred.'));

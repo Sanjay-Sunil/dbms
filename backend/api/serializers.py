@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 from core.models import FoodPoint, Ingredient, StaffAssignment
 from menu.models import MenuItem, MenuRecipe
 from inventory.models import InventoryStock, StockMovement
@@ -139,6 +140,9 @@ class MessMealRecordSerializer(serializers.ModelSerializer):
         model = MessMealRecord
         fields = '__all__'
         read_only_fields = ('recorded_at', 'recorded_by')
+        validators = [UniqueTogetherValidator(
+            queryset=MessMealRecord.objects.all(), fields=('session', 'student_user'),
+            message='This student is already recorded for this meal session.')]
 
 
 class MessMealSessionSerializer(serializers.ModelSerializer):
@@ -150,6 +154,9 @@ class MessMealSessionSerializer(serializers.ModelSerializer):
         model = MessMealSession
         fields = '__all__'
         read_only_fields = ('created_at', 'created_by')
+        validators = [UniqueTogetherValidator(
+            queryset=MessMealSession.objects.all(), fields=('food_point', 'session_date', 'meal_type'),
+            message='A session for this meal already exists on that date.')]
 
 
 class MessMealSessionListSerializer(serializers.ModelSerializer):
