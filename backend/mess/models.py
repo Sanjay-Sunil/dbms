@@ -50,6 +50,9 @@ class MessMealRecord(models.Model):
     class Meta:
         db_table = 'mess_meal_record'
         unique_together = ('session', 'student_user')
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount_due__gte=0), name='chk_meal_amount'),
+        ]
 
     def __str__(self):
         return f'{self.student_user} — {self.session}'

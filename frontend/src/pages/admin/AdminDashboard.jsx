@@ -390,20 +390,20 @@ export default function AdminDashboard() {
                       return (
                         <tr key={idx} className="hover:bg-zinc-900/40 transition">
                           <td className="px-4 py-3 font-semibold text-white">
-                            {row.food_point__name}
+                            {row.food_point}
                           </td>
                           <td className="px-4 py-3 font-medium text-zinc-200">
-                            {row.ingredient__ingredient_name}
+                            {row.ingredient_name}
                           </td>
                           <td className="px-4 py-3 font-mono font-bold text-amber-400">
-                            {onHand.toFixed(2)} {row.ingredient__unit_of_measure}
+                            {onHand.toFixed(2)} {row.unit_of_measure}
                           </td>
                           <td className="px-4 py-3 font-mono text-zinc-400">
-                            {reorder.toFixed(2)} {row.ingredient__unit_of_measure}
+                            {reorder.toFixed(2)} {row.unit_of_measure}
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant="warning" size="xs">
-                              Restock needed (~{deficit} {row.ingredient__unit_of_measure})
+                              Restock needed (~{deficit} {row.unit_of_measure})
                             </Badge>
                           </td>
                         </tr>

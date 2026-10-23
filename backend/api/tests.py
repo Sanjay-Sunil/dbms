@@ -134,3 +134,46 @@ class RegistrationTests(APITestCase):
         self.assertEqual(user.role, 'STUDENT')
         self.assertNotEqual(user.password, 'pw123456')
         self.assertTrue(user.check_password('pw123456'))
+
+
+class DatabaseConstraintTests(APITestCase):
+    """CHECK constraints from the SQL schema are enforced by the database itself."""
+
+    def test_stock_cannot_go_negative_at_db_level(self):
+        from django.db import IntegrityError, transaction
+        fp = FoodPoint.objects.create(name='Millets')
+        ing = Ingredient.objects.create(ingredient_name='Ragi', unit_of_measure='kg')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            InventoryStock.objects.create(food_point=fp, ingredient=ing, quantity_on_hand=-1)
+
+    def test_roll_number_only_for_students(self):
+        from django.db import IntegrityError, transaction
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user('s', password='x', role='STUDENT')  # missing roll no
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user('t', password='x', role='STAFF', student_roll_no='X1')
+
+
+class ReportViewTests(APITestCase):
+    def test_reports_read_from_sql_views(self):
+        fp = FoodPoint.objects.create(name='Milma')
+        admin = User.objects.create_user('adm', password='x', role='ADMIN')
+        stu = User.objects.create_user('stu', password='x', role='STUDENT', student_roll_no='CS01')
+        Sale.objects.create(food_point=fp, recorded_by=admin, student_user=stu,
+                            payment_method='CASH', total_amount=Decimal('50'))
+        Sale.objects.create(food_point=fp, recorded_by=admin, payment_method='CASH',
+                            payment_status='REFUNDED', total_amount=Decimal('30'))
+        ing = Ingredient.objects.create(ingredient_name='Curd', unit_of_measure='L')
+        InventoryStock.objects.create(food_point=fp, ingredient=ing,
+                                      quantity_on_hand=Decimal('1'), reorder_level=Decimal('2'))
+
+        self.client.force_authenticate(admin)
+        row = self.client.get('/api/reports/sales-by-food-point/').data[0]
+        self.assertEqual((row['name'], row['sale_count'], Decimal(str(row['paid_sales']))),
+                         ('Milma', 2, Decimal('50')))  # refunded sale not counted as revenue
+        low = self.client.get('/api/reports/low-stock/').data
+        self.assertEqual(low[0]['ingredient_name'], 'Curd')
+
+        self.client.force_authenticate(stu)
+        self.assertEqual(len(self.client.get('/api/reports/student/CS01/').data['sales']), 1)
+        self.assertEqual(self.client.get('/api/reports/student/CS02/').status_code, 403)

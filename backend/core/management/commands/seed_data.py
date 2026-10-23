@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from core.models import User, FoodPoint, Ingredient, StaffAssignment
@@ -19,7 +20,9 @@ from mess.models import MessMealSession, MessMealRecord
 class Command(BaseCommand):
     help = 'Seed the database with realistic campus food data'
 
+    @transaction.atomic
     def handle(self, *args, **options):
+        random.seed(42)  # reproducible demo data
         self.stdout.write('Seeding database...')
 
         self._create_food_points()

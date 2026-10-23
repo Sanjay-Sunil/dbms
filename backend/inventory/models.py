@@ -14,6 +14,10 @@ class InventoryStock(models.Model):
     class Meta:
         db_table = 'inventory_stock'
         unique_together = ('food_point', 'ingredient')
+        constraints = [
+            models.CheckConstraint(condition=models.Q(quantity_on_hand__gte=0), name='chk_stock_qty'),
+            models.CheckConstraint(condition=models.Q(reorder_level__gte=0), name='chk_reorder_qty'),
+        ]
 
     def __str__(self):
         return f'{self.ingredient.ingredient_name} @ {self.food_point.name}: {self.quantity_on_hand}'
@@ -43,6 +47,11 @@ class StockMovement(models.Model):
 
     class Meta:
         db_table = 'stock_movement'
+        indexes = [models.Index(fields=['food_point', 'ingredient', 'created_at'],
+                                name='idx_movement_point_ing_date')]
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(quantity_change=0), name='chk_movement_nonzero'),
+        ]
 
     def __str__(self):
         return f'{self.movement_type}: {self.quantity_change} {self.ingredient.ingredient_name}'

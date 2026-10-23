@@ -1,5 +1,5 @@
 from decimal import Decimal
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Sum, Count, Q, F
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
@@ -336,31 +336,51 @@ class StudentMessHistoryView(generics.ListAPIView):
 
 # ── Reports ───────────────────────────────────────
 
+def _query_view(sql, params=()):
+    """Run a parameterised query against a report view and return rows as dicts."""
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        cols = [c[0] for c in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
 class ReportSalesByFoodPointView(APIView):
-    """Admin: sales summary by food point."""
+    """Admin: sales summary by food point (SQL view v_sales_by_food_point)."""
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def get(self, request):
-        data = FoodPoint.objects.annotate(
-            sale_count=Count('sales', filter=Q(sales__payment_status='PAID')),
-            paid_sales=Sum('sales__total_amount', filter=Q(sales__payment_status='PAID')),
-        ).values('id', 'name', 'sale_count', 'paid_sales').order_by('-paid_sales')
-
-        for row in data:
-            row['paid_sales'] = row['paid_sales'] or 0
-
-        return Response(list(data))
+        rows = _query_view('SELECT * FROM v_sales_by_food_point ORDER BY paid_sales DESC')
+        return Response([{'id': r['food_point_id'], 'name': r['food_point'],
+                          'sale_count': r['sale_count'], 'paid_sales': r['paid_sales']}
+                         for r in rows])
 
 
 class ReportLowStockView(APIView):
-    """Admin/Staff: low stock items."""
+    """Admin/Staff: ingredients at or below reorder level (SQL view v_low_stock)."""
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
 
     def get(self, request):
-        low = InventoryStock.objects.filter(
-            quantity_on_hand__lte=F('reorder_level')
-        ).select_related('food_point', 'ingredient').values(
-            'food_point__name', 'ingredient__ingredient_name',
-            'ingredient__unit_of_measure', 'quantity_on_hand', 'reorder_level'
-        )
-        return Response(list(low))
+        sql = 'SELECT * FROM v_low_stock'
+        params = []
+        if request.query_params.get('food_point'):
+            sql += ' WHERE food_point_id = %s'
+            params.append(request.query_params['food_point'])
+        return Response(_query_view(sql + ' ORDER BY food_point, ingredient_name', params))
+
+
+class ReportStudentHistoryView(APIView):
+    """Student sale and mess history by roll number (views v_student_sale_history
+    and v_student_mess_history). Students may only look up their own roll number."""
+
+    def get(self, request, roll_no):
+        user = request.user
+        if user.role == User.Role.STUDENT and user.student_roll_no != roll_no:
+            raise PermissionDenied('Students can only view their own history.')
+        return Response({
+            'sales': _query_view(
+                'SELECT * FROM v_student_sale_history WHERE student_roll_no = %s '
+                'ORDER BY sale_datetime DESC', [roll_no]),
+            'mess': _query_view(
+                'SELECT * FROM v_student_mess_history WHERE student_roll_no = %s '
+                'ORDER BY session_date DESC', [roll_no]),
+        })

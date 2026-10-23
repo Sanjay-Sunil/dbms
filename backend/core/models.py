@@ -1,5 +1,11 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
+
+
+class AppUserManager(UserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('role', User.Role.ADMIN)
+        return super().create_superuser(username, email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -15,8 +21,18 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True, default='')
     is_active = models.BooleanField(default=True)
 
+    objects = AppUserManager()
+
     class Meta:
         db_table = 'app_user'
+        constraints = [
+            # A roll number exists exactly when the user is a student.
+            models.CheckConstraint(
+                condition=(models.Q(role='STUDENT', student_roll_no__isnull=False)
+                           | (~models.Q(role='STUDENT') & models.Q(student_roll_no__isnull=True))),
+                name='chk_student_roll_role',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.full_name} ({self.role})'
@@ -90,6 +106,13 @@ class StaffAssignment(models.Model):
 
     class Meta:
         db_table = 'staff_assignment'
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(assigned_until__isnull=True)
+                | models.Q(assigned_until__gte=models.F('assigned_from')),
+                name='chk_assignment_dates',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.staff_user} → {self.food_point}'
