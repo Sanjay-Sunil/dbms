@@ -663,7 +663,7 @@ export default function StaffDashboard() {
             <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-white">Sales Register · {activeOutlet?.name}</h2>
-                <p className="text-xs text-zinc-400">{salesList.length} total orders recorded</p>
+                <p className="text-xs text-zinc-400">{salesTotal} total orders recorded{salesTotal > salesList.length && ` · showing latest ${salesList.length}`}</p>
               </div>
             </div>
 
