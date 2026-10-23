@@ -19,6 +19,7 @@ export default function AdminDashboard() {
   const [salesByFoodPoint, setSalesByFoodPoint] = useState([]);
   const [lowStockReports, setLowStockReports] = useState([]);
   const [allSales, setAllSales] = useState([]);
+  const [salesTotal, setSalesTotal] = useState(0);
   const [menuList, setMenuList] = useState([]);
   const [foodPoints, setFoodPoints] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -53,7 +54,7 @@ export default function AdminDashboard() {
       const [salesFpRes, lowRes, salesRes, menuRes, fpRes, usersRes] = await Promise.all([
         reportsAPI.salesByFoodPoint().catch(() => ({ data: [] })),
         reportsAPI.lowStock().catch(() => ({ data: [] })),
-        salesAPI.list().catch(() => ({ data: [] })),
+        salesAPI.list({ page_size: 100 }).catch(() => ({ data: [] })),
         menuAPI.list().catch(() => ({ data: [] })),
         foodPointAPI.list().catch(() => ({ data: [] })),
         authAPI.listUsers().catch(() => ({ data: [] })),
@@ -62,6 +63,7 @@ export default function AdminDashboard() {
       const fpSales = Array.isArray(salesFpRes.data) ? salesFpRes.data : salesFpRes.data?.results || [];
       const lowStock = Array.isArray(lowRes.data) ? lowRes.data : lowRes.data?.results || [];
       const sales = Array.isArray(salesRes.data) ? salesRes.data : salesRes.data?.results || [];
+      setSalesTotal(salesRes.data?.count ?? sales.length);
       const menu = Array.isArray(menuRes.data) ? menuRes.data : menuRes.data?.results || [];
       const fps = Array.isArray(fpRes.data) ? fpRes.data : fpRes.data?.results || [];
       const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.results || [];
@@ -276,7 +278,7 @@ export default function AdminDashboard() {
               }`}
             >
               <Receipt className="w-4 h-4" />
-              <span>All Sales Stream ({allSales.length})</span>
+              <span>All Sales Stream ({salesTotal})</span>
             </button>
 
             <button
@@ -424,7 +426,7 @@ export default function AdminDashboard() {
             <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-semibold text-white">Campus Counter Sales Stream</h2>
-                <p className="text-xs text-zinc-400">{allSales.length} total recorded transactions</p>
+                <p className="text-xs text-zinc-400">{salesTotal} total recorded transactions · showing latest {allSales.length}</p>
               </div>
             </div>
 

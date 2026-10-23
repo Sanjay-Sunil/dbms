@@ -36,7 +36,7 @@ export default function StudentDashboard() {
       const [fpRes, menuRes, salesRes, messRes] = await Promise.all([
         foodPointAPI.list(),
         menuAPI.list(),
-        salesAPI.list(),
+        salesAPI.list({ page_size: 1000 }),
         messAPI.myHistory(),
       ]);
 

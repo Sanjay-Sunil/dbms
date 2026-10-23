@@ -34,6 +34,7 @@ export default function StaffDashboard() {
 
   // Sales log
   const [salesList, setSalesList] = useState([]);
+  const [salesTotal, setSalesTotal] = useState(0);
 
   // Inventory
   const [inventoryList, setInventoryList] = useState([]);
@@ -108,12 +109,13 @@ export default function StaffDashboard() {
       const [menuRes, invRes, salesRes] = await Promise.all([
         menuAPI.list({ food_point: fpId }),
         inventoryAPI.list({ food_point: fpId }),
-        salesAPI.list({ food_point: fpId }),
+        salesAPI.list({ food_point: fpId, page_size: 100 }),
       ]);
 
       const menu = Array.isArray(menuRes.data) ? menuRes.data : menuRes.data?.results || [];
       const inv = Array.isArray(invRes.data) ? invRes.data : invRes.data?.results || [];
       const sales = Array.isArray(salesRes.data) ? salesRes.data : salesRes.data?.results || [];
+      setSalesTotal(salesRes.data?.count ?? sales.length);
 
       setMenuItems(menu);
       setInventoryList(inv);
@@ -154,6 +156,7 @@ export default function StaffDashboard() {
 
   // Cart Management
   const addToCart = (item) => {
+    setLastSaleReceipt(null);
     const existing = cart.find((c) => c.item.id === item.id);
     if (existing) {
       setCart(cart.map((c) => c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c));
@@ -186,6 +189,7 @@ export default function StaffDashboard() {
   const handleProcessSale = async () => {
     if (cart.length === 0) return;
     setPosSubmitting(true);
+    setLastSaleReceipt(null);
     try {
       const payload = {
         food_point_id: activeOutlet.id,
@@ -365,7 +369,7 @@ export default function StaffDashboard() {
               }`}
             >
               <Receipt className="w-4 h-4" />
-              <span>Sales Log ({salesList.length})</span>
+              <span>Sales Log ({salesTotal})</span>
             </button>
 
             <button
@@ -430,9 +434,19 @@ export default function StaffDashboard() {
                       className="bg-[#121212] border border-zinc-800 hover:border-zinc-600 disabled:opacity-40 rounded-xl p-3 text-left transition flex flex-col justify-between h-28 cursor-pointer group hover:bg-zinc-900/40"
                     >
                       <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider">
-                          {item.category}
-                        </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider">
+                            {item.category}
+                          </span>
+                          {item.stock_tracked && (
+                            <span
+                              title="Recipe-linked: ingredients are deducted from inventory on sale"
+                              className="flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider text-emerald-400/80"
+                            >
+                              <Package className="w-2.5 h-2.5" /> Tracked
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs font-semibold text-white group-hover:text-zinc-100 line-clamp-2">
                           {item.item_name}
                         </div>
