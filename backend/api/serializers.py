@@ -131,6 +131,9 @@ class SaleCreateSerializer(serializers.Serializer):
 class MessMealRecordSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student_user.full_name', read_only=True)
     student_roll = serializers.CharField(source='student_user.student_roll_no', read_only=True)
+    session_date = serializers.DateField(source='session.session_date', read_only=True)
+    meal_type = serializers.CharField(source='session.meal_type', read_only=True)
+    food_point_name = serializers.CharField(source='session.food_point.name', read_only=True)
 
     class Meta:
         model = MessMealRecord

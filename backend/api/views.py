@@ -347,7 +347,10 @@ class StudentMessHistoryView(generics.ListAPIView):
     def get_queryset(self):
         return MessMealRecord.objects.filter(
             student_user=self.request.user
-        ).select_related('session__food_point').order_by('-session__session_date')
+        ).select_related('session__food_point', 'student_user').order_by(
+            '-session__session_date',
+            Case(*[When(session__meal_type=m, then=i) for i, m in
+                   enumerate(['DINNER', 'SNACKS', 'LUNCH', 'BREAKFAST'])]))
 
 
 # ── Reports ───────────────────────────────────────
