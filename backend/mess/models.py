@@ -11,11 +11,11 @@ class MessMealSession(models.Model):
         DINNER = 'DINNER', 'Dinner'
         SNACKS = 'SNACKS', 'Snacks'
 
-    food_point = models.ForeignKey(FoodPoint, on_delete=models.CASCADE, related_name='meal_sessions')
+    food_point = models.ForeignKey(FoodPoint, on_delete=models.PROTECT, related_name='meal_sessions')
     session_date = models.DateField()
     meal_type = models.CharField(max_length=10, choices=MealType.choices)
     notes = models.CharField(max_length=255, blank=True, default='')
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_sessions')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_sessions')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -39,12 +39,12 @@ class MessMealRecord(models.Model):
         PENDING = 'PENDING', 'Pending'
         EXEMPT = 'EXEMPT', 'Exempt'
 
-    session = models.ForeignKey(MessMealSession, on_delete=models.CASCADE, related_name='records')
-    student_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mess_records')
+    session = models.ForeignKey(MessMealSession, on_delete=models.PROTECT, related_name='records')
+    student_user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='mess_records')
     attendance_status = models.CharField(max_length=10, choices=AttendanceStatus.choices, default=AttendanceStatus.SERVED)
     amount_due = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_status = models.CharField(max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
-    recorded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recorded_meal_records')
+    recorded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='recorded_meal_records')
     recorded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

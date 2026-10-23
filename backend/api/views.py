@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db import connection, transaction
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, ProtectedError
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -94,6 +94,14 @@ class MenuItemAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = MenuItemSerializer
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
 
+    def perform_destroy(self, instance):
+        # sale_item -> menu_item is ON DELETE RESTRICT: sold items keep their history.
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise Conflict('This item has sales history and cannot be deleted. '
+                           'Mark it unavailable instead.')
+
 
 # ── Inventory ─────────────────────────────────────
 
@@ -173,6 +181,11 @@ class SaleListView(generics.ListAPIView):
         if fp:
             qs = qs.filter(food_point_id=fp)
         return qs.order_by('-sale_datetime')
+
+
+class Conflict(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = 'conflict'
 
 
 class InsufficientStock(APIException):

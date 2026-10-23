@@ -36,12 +36,12 @@ class StockMovement(models.Model):
         ADJUSTMENT = 'ADJUSTMENT', 'Adjustment'
         WASTE = 'WASTE', 'Waste'
 
-    food_point = models.ForeignKey(FoodPoint, on_delete=models.CASCADE, related_name='movements')
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, related_name='movements')
+    food_point = models.ForeignKey(FoodPoint, on_delete=models.PROTECT, related_name='movements')
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.PROTECT, related_name='movements')
     movement_type = models.CharField(max_length=20, choices=MovementType.choices)
     quantity_change = models.DecimalField(max_digits=12, decimal_places=3)
     sale = models.ForeignKey('sales.Sale', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements')
-    recorded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recorded_movements')
+    recorded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='recorded_movements')
     reason = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 

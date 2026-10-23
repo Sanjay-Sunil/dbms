@@ -84,6 +84,13 @@ class CounterSaleTransactionTests(APITestCase):
                         student_user_id=self.staff.id)
         self.assertEqual(res.status_code, 400)
 
+    def test_sold_menu_item_cannot_be_deleted(self):
+        self.sell([{'menu_item_id': self.cone.id, 'quantity': 1}])
+        res = self.client.delete(f'/api/menu/manage/{self.cone.id}/')
+        self.assertEqual(res.status_code, 409)
+        self.assertTrue(MenuItem.objects.filter(pk=self.cone.id).exists())
+        self.assertEqual(Sale.objects.count(), 1)
+
     def test_student_cannot_record_sales(self):
         self.client.force_authenticate(self.student)
         res = self.sell([{'menu_item_id': self.cone.id, 'quantity': 1}])

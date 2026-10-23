@@ -17,8 +17,8 @@ class Sale(models.Model):
         PENDING = 'PENDING', 'Pending'
         REFUNDED = 'REFUNDED', 'Refunded'
 
-    food_point = models.ForeignKey(FoodPoint, on_delete=models.CASCADE, related_name='sales')
-    recorded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recorded_sales')
+    food_point = models.ForeignKey(FoodPoint, on_delete=models.PROTECT, related_name='sales')
+    recorded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='recorded_sales')
     student_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
     sale_datetime = models.DateTimeField(auto_now_add=True)
     payment_method = models.CharField(max_length=5, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
@@ -45,7 +45,7 @@ class SaleItem(models.Model):
     """Individual item in a counter sale; unit_price preserves historical price."""
 
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='sale_items')
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.PROTECT, related_name='sale_items')
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
 
