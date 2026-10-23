@@ -54,11 +54,16 @@ class MenuItemSerializer(serializers.ModelSerializer):
 class MenuItemListSerializer(serializers.ModelSerializer):
     """Lightweight menu item for browse views."""
     food_point_name = serializers.CharField(source='food_point.name', read_only=True)
+    stock_tracked = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
         fields = ('id', 'food_point', 'food_point_name', 'item_name', 'category',
-                  'description', 'current_price', 'is_available')
+                  'description', 'current_price', 'is_available', 'stock_tracked')
+
+    def get_stock_tracked(self, obj):
+        """Items without a recipe are sold without inventory deduction."""
+        return obj.recipe_count > 0
 
 
 # ── Inventory ─────────────────────────────────────

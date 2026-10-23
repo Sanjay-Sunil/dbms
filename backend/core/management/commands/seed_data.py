@@ -334,10 +334,11 @@ class Command(BaseCommand):
             for ing_id in recipe_ings:
                 ing = Ingredient.objects.get(pk=ing_id)
                 low, high = STOCK_RANGE[ing.unit_of_measure]
-                qty = Decimal(str(random.uniform(low, high))).quantize(Decimal('0.001'))
-                reorder = (qty * Decimal('0.2')).quantize(Decimal('0.001'))
+                step = Decimal('1') if ing.unit_of_measure in ('piece', 'packet') else Decimal('0.001')
+                qty = Decimal(str(random.uniform(low, high))).quantize(step)
+                reorder = (qty * Decimal('0.2')).quantize(step)
                 if random.random() < 0.15:  # a few items running low, for the low-stock report
-                    qty = (reorder * Decimal('0.6')).quantize(Decimal('0.001'))
+                    qty = (reorder * Decimal('0.6')).quantize(step)
                 InventoryStock.objects.get_or_create(
                     food_point=fp, ingredient=ing,
                     defaults={'quantity_on_hand': qty, 'reorder_level': reorder}
@@ -401,7 +402,7 @@ class Command(BaseCommand):
                         total += mi.current_price * qty
 
                     sale.total_amount = total
-                    sale.save()
+                    sale.save(update_fields=['total_amount'])  # keep the back-dated sale_datetime
                     count += 1
 
         self.stdout.write(f'  Created {count} sales with items')

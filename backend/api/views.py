@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db import connection, transaction
-from django.db.models import Sum, Count, Q, F, ProtectedError
+from django.db.models import Case, Count, F, ProtectedError, Q, Sum, When
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -64,7 +64,8 @@ class MenuItemListView(generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        qs = MenuItem.objects.filter(is_available=True).select_related('food_point')
+        qs = (MenuItem.objects.filter(is_available=True).select_related('food_point')
+              .annotate(recipe_count=Count('recipes')))
         fp = self.request.query_params.get('food_point')
         cat = self.request.query_params.get('category')
         if fp:
@@ -310,7 +311,9 @@ class MessSessionListView(generics.ListAPIView):
         fp = self.request.query_params.get('food_point')
         if fp:
             qs = qs.filter(food_point_id=fp)
-        return qs.order_by('-session_date', 'meal_type')
+        meal_order = Case(*[When(meal_type=m, then=i) for i, m in
+                            enumerate(['BREAKFAST', 'LUNCH', 'SNACKS', 'DINNER'])])
+        return qs.order_by('-session_date', meal_order)
 
 
 class MessSessionDetailView(generics.RetrieveAPIView):
