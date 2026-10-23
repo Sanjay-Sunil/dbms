@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Sum, Count, Q, F
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,6 +21,15 @@ from .serializers import (
     MessMealSessionSerializer, MessMealSessionListSerializer,
     MessMealRecordSerializer,
 )
+
+
+def _can_operate(user, food_point):
+    """Admins may act anywhere; staff only at their actively assigned food points."""
+    if user.role == User.Role.ADMIN:
+        return True
+    return StaffAssignment.objects.filter(
+        staff_user=user, food_point=food_point, is_active=True
+    ).exists()
 
 
 # ── Food Points ───────────────────────────────────
@@ -109,18 +119,35 @@ class StockMovementCreateView(generics.CreateAPIView):
     serializer_class = StockMovementSerializer
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        movement = serializer.save(recorded_by=self.request.user)
-        # Update inventory stock
-        stock, _ = InventoryStock.objects.get_or_create(
-            food_point=movement.food_point,
-            ingredient=movement.ingredient,
-            defaults={'quantity_on_hand': 0, 'reorder_level': 0}
+        data = serializer.validated_data
+        food_point, ingredient = data['food_point'], data['ingredient']
+        movement_type, change = data['movement_type'], data['quantity_change']
+
+        if not _can_operate(self.request.user, food_point):
+            raise PermissionDenied('Not assigned to this food point.')
+        if change == 0:
+            raise ValidationError({'quantity_change': 'Must be non-zero.'})
+        if movement_type == StockMovement.MovementType.SALE_CONSUMPTION:
+            raise ValidationError({'movement_type': 'Sale consumption is recorded automatically by sales.'})
+        if movement_type == StockMovement.MovementType.RESTOCK and change < 0:
+            raise ValidationError({'quantity_change': 'Restock must be positive.'})
+        if movement_type == StockMovement.MovementType.WASTE and change > 0:
+            raise ValidationError({'quantity_change': 'Waste must be negative.'})
+
+        # Lock the stock row so concurrent movements cannot interleave.
+        stock, _ = InventoryStock.objects.select_for_update().get_or_create(
+            food_point=food_point, ingredient=ingredient,
+            defaults={'quantity_on_hand': 0, 'reorder_level': 0},
         )
-        stock.quantity_on_hand += movement.quantity_change
-        if stock.quantity_on_hand < 0:
-            stock.quantity_on_hand = Decimal('0')
+        if stock.quantity_on_hand + change < 0:
+            raise ValidationError({'quantity_change': (
+                f'Only {stock.quantity_on_hand} {ingredient.unit_of_measure} on hand; '
+                f'cannot remove {-change}.')})
+        stock.quantity_on_hand += change
         stock.save()
+        serializer.save(recorded_by=self.request.user)
 
 
 # ── Sales ─────────────────────────────────────────
@@ -148,8 +175,24 @@ class SaleListView(generics.ListAPIView):
         return qs.order_by('-sale_datetime')
 
 
+class InsufficientStock(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = 'Insufficient stock.'
+    default_code = 'insufficient_stock'
+
+
 class SaleCreateView(APIView):
-    """Staff: record a new counter sale with items in one transaction."""
+    """
+    Staff: record a counter sale in ONE database transaction.
+
+    1. Validate staff assignment, student and that every item belongs to the point.
+    2. Insert the sale header and sale items, snapshotting the current price.
+    3. Multiply recipe quantities by sold quantities.
+    4. Lock inventory rows (SELECT ... FOR UPDATE), verify stock, deduct and log
+       SALE_CONSUMPTION movements.
+    5. Store the computed total. Any failure rolls back every step.
+    Items without a recipe are explicitly not stock-tracked.
+    """
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
 
     @transaction.atomic
@@ -158,19 +201,58 @@ class SaleCreateView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        food_point = FoodPoint.objects.get(pk=data['food_point_id'])
-
-        # Verify staff assignment
-        if request.user.role == User.Role.STAFF:
-            if not StaffAssignment.objects.filter(
-                staff_user=request.user, food_point=food_point, is_active=True
-            ).exists():
-                return Response({'error': 'Not assigned to this food point'},
-                                status=status.HTTP_403_FORBIDDEN)
+        food_point = FoodPoint.objects.filter(pk=data['food_point_id'], is_active=True).first()
+        if food_point is None:
+            raise ValidationError({'food_point_id': 'Unknown or inactive food point.'})
+        if not _can_operate(request.user, food_point):
+            raise PermissionDenied('Not assigned to this food point.')
 
         student = None
         if data.get('student_user_id'):
-            student = User.objects.get(pk=data['student_user_id'])
+            student = User.objects.filter(
+                pk=data['student_user_id'], role=User.Role.STUDENT, is_active=True
+            ).first()
+            if student is None:
+                raise ValidationError({'student_user_id': 'Not an active student.'})
+
+        # Validate and merge line items (same item twice -> one line).
+        quantities = {}
+        for line in data['items']:
+            quantities[line['menu_item_id']] = quantities.get(line['menu_item_id'], 0) + line['quantity']
+        menu_items = {
+            mi.id: mi for mi in MenuItem.objects.filter(pk__in=quantities)
+            .prefetch_related('recipes__ingredient')
+        }
+        for item_id in quantities:
+            mi = menu_items.get(item_id)
+            if mi is None or mi.food_point_id != food_point.id:
+                raise ValidationError({'items': f'Menu item {item_id} is not sold at {food_point.name}.'})
+            if not mi.is_available:
+                raise ValidationError({'items': f'{mi.item_name} is currently unavailable.'})
+
+        # Total ingredient requirement for the whole sale.
+        required = {}
+        for item_id, qty in quantities.items():
+            for recipe in menu_items[item_id].recipes.all():
+                required[recipe.ingredient] = required.get(recipe.ingredient, Decimal('0')) + recipe.quantity_required * qty
+
+        # Lock stock rows in a fixed order (avoids deadlocks) and verify availability.
+        stocks = {
+            st.ingredient_id: st for st in InventoryStock.objects.select_for_update()
+            .filter(food_point=food_point, ingredient__in=required.keys())
+            .order_by('ingredient_id')
+        }
+        shortages = []
+        for ingredient, needed in required.items():
+            on_hand = stocks[ingredient.id].quantity_on_hand if ingredient.id in stocks else Decimal('0')
+            if on_hand < needed:
+                shortages.append({
+                    'ingredient': ingredient.ingredient_name,
+                    'unit': ingredient.unit_of_measure,
+                    'required': str(needed), 'on_hand': str(on_hand),
+                })
+        if shortages:
+            raise InsufficientStock({'error': 'Insufficient stock', 'shortages': shortages})
 
         sale = Sale.objects.create(
             food_point=food_point,
@@ -179,44 +261,27 @@ class SaleCreateView(APIView):
             payment_method=data['payment_method'],
             notes=data.get('notes', ''),
         )
-
         total = Decimal('0')
-        for item_data in data['items']:
-            menu_item = MenuItem.objects.get(pk=item_data['menu_item_id'])
-            qty = int(item_data['quantity'])
-            unit_price = menu_item.current_price
+        for item_id, qty in quantities.items():
+            mi = menu_items[item_id]
+            SaleItem.objects.create(sale=sale, menu_item=mi, quantity=qty, unit_price=mi.current_price)
+            total += mi.current_price * qty
 
-            SaleItem.objects.create(
+        for ingredient, needed in required.items():
+            stock = stocks[ingredient.id]
+            stock.quantity_on_hand -= needed
+            stock.save()
+            StockMovement.objects.create(
+                food_point=food_point,
+                ingredient=ingredient,
+                movement_type=StockMovement.MovementType.SALE_CONSUMPTION,
+                quantity_change=-needed,
                 sale=sale,
-                menu_item=menu_item,
-                quantity=qty,
-                unit_price=unit_price,
+                recorded_by=request.user,
             )
-            total += unit_price * qty
-
-            # Deduct inventory via recipes
-            for recipe in menu_item.recipes.select_related('ingredient'):
-                deduction = recipe.quantity_required * qty
-                stock, _ = InventoryStock.objects.get_or_create(
-                    food_point=food_point,
-                    ingredient=recipe.ingredient,
-                    defaults={'quantity_on_hand': 0, 'reorder_level': 0}
-                )
-                stock.quantity_on_hand = max(Decimal('0'), stock.quantity_on_hand - deduction)
-                stock.save()
-
-                StockMovement.objects.create(
-                    food_point=food_point,
-                    ingredient=recipe.ingredient,
-                    movement_type=StockMovement.MovementType.SALE_CONSUMPTION,
-                    quantity_change=-deduction,
-                    sale=sale,
-                    recorded_by=request.user,
-                )
 
         sale.total_amount = total
         sale.save()
-
         return Response(SaleSerializer(sale).data, status=status.HTTP_201_CREATED)
 
 

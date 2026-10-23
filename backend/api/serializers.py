@@ -81,7 +81,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockMovement
         fields = '__all__'
-        read_only_fields = ('created_at',)
+        read_only_fields = ('created_at', 'recorded_by', 'sale')
 
 
 # ── Sales ─────────────────────────────────────────
@@ -107,13 +107,18 @@ class SaleSerializer(serializers.ModelSerializer):
         read_only_fields = ('sale_datetime', 'total_amount')
 
 
+class SaleLineSerializer(serializers.Serializer):
+    menu_item_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
 class SaleCreateSerializer(serializers.Serializer):
     """Used to create a sale with items in one request."""
     food_point_id = serializers.IntegerField()
     student_user_id = serializers.IntegerField(required=False, allow_null=True)
     payment_method = serializers.ChoiceField(choices=Sale.PaymentMethod.choices, default='CASH')
     notes = serializers.CharField(required=False, default='', allow_blank=True)
-    items = serializers.ListField(child=serializers.DictField(), min_length=1)
+    items = SaleLineSerializer(many=True, allow_empty=False)
 
 
 # ── Mess ──────────────────────────────────────────
@@ -125,7 +130,7 @@ class MessMealRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = MessMealRecord
         fields = '__all__'
-        read_only_fields = ('recorded_at',)
+        read_only_fields = ('recorded_at', 'recorded_by')
 
 
 class MessMealSessionSerializer(serializers.ModelSerializer):
@@ -136,7 +141,7 @@ class MessMealSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = MessMealSession
         fields = '__all__'
-        read_only_fields = ('created_at',)
+        read_only_fields = ('created_at', 'created_by')
 
 
 class MessMealSessionListSerializer(serializers.ModelSerializer):
