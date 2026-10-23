@@ -5,6 +5,7 @@ import {
 import { useToast } from '../../components/Toast';
 import Badge from '../../components/Badge';
 import Modal from '../../components/Modal';
+import RevenueTrend from '../../components/RevenueTrend';
 import {
   Shield, BarChart3, AlertTriangle, UtensilsCrossed, Users, Receipt,
   Plus, Edit2, Trash2, Check, RefreshCw, Search, ArrowUpRight, Store
@@ -20,6 +21,7 @@ export default function AdminDashboard() {
   const [lowStockReports, setLowStockReports] = useState([]);
   const [allSales, setAllSales] = useState([]);
   const [salesTotal, setSalesTotal] = useState(0);
+  const [dailyRevenue, setDailyRevenue] = useState([]);
   const [menuList, setMenuList] = useState([]);
   const [foodPoints, setFoodPoints] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -51,13 +53,14 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      const [salesFpRes, lowRes, salesRes, menuRes, fpRes, usersRes] = await Promise.all([
+      const [salesFpRes, lowRes, salesRes, menuRes, fpRes, usersRes, dailyRes] = await Promise.all([
         reportsAPI.salesByFoodPoint().catch(() => ({ data: [] })),
         reportsAPI.lowStock().catch(() => ({ data: [] })),
         salesAPI.list({ page_size: 100 }).catch(() => ({ data: [] })),
         menuAPI.list().catch(() => ({ data: [] })),
         foodPointAPI.list().catch(() => ({ data: [] })),
         authAPI.listUsers().catch(() => ({ data: [] })),
+        reportsAPI.dailyRevenue(30).catch(() => ({ data: [] })),
       ]);
 
       const fpSales = Array.isArray(salesFpRes.data) ? salesFpRes.data : salesFpRes.data?.results || [];
@@ -68,6 +71,7 @@ export default function AdminDashboard() {
       const fps = Array.isArray(fpRes.data) ? fpRes.data : fpRes.data?.results || [];
       const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.results || [];
 
+      setDailyRevenue(Array.isArray(dailyRes.data) ? dailyRes.data : []);
       setSalesByFoodPoint(fpSales);
       setLowStockReports(lowStock);
       setAllSales(sales);
@@ -310,12 +314,17 @@ export default function AdminDashboard() {
         {/* ── TAB 1: REVENUE & OUTLET REPORTS ───────────────────────────── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {dailyRevenue.length > 0 && (
+              <div className="bg-[#121212] border border-zinc-800 rounded-2xl p-6">
+                <RevenueTrend data={dailyRevenue} />
+              </div>
+            )}
             <div className="bg-[#121212] border border-zinc-800 rounded-2xl p-6">
               <h2 className="text-base font-semibold text-white mb-1">
                 Sales & Revenue Distribution by Outlet
               </h2>
               <p className="text-xs text-zinc-400 mb-6">
-                Direct SQL aggregate comparison across campus food points
+                Served from the SQL view v_sales_by_food_point
               </p>
 
               <div className="space-y-5">

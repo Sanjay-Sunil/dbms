@@ -1,6 +1,9 @@
 from decimal import Decimal
 from django.db import connection, transaction
 from django.db.models import Case, Count, F, ProtectedError, Q, Sum, When
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -372,6 +375,28 @@ class ReportSalesByFoodPointView(APIView):
         return Response([{'id': r['food_point_id'], 'name': r['food_point'],
                           'sale_count': r['sale_count'], 'paid_sales': r['paid_sales']}
                          for r in rows])
+
+
+class ReportDailyRevenueView(APIView):
+    """Admin: paid revenue and order count per day for the last N days
+    (GROUP BY DATE(sale_datetime)); days without sales are returned as zero."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        days = min(max(int(request.query_params.get('days', 30)), 1), 365)
+        today = timezone.localdate()
+        start = today - timedelta(days=days - 1)
+        rows = (Sale.objects.filter(payment_status='PAID', sale_datetime__date__gte=start)
+                .annotate(day=TruncDate('sale_datetime'))
+                .values('day')
+                .annotate(revenue=Sum('total_amount'), orders=Count('id')))
+        by_day = {r['day']: r for r in rows}
+        return Response([
+            {'date': d.isoformat(),
+             'revenue': by_day.get(d, {}).get('revenue') or 0,
+             'orders': by_day.get(d, {}).get('orders') or 0}
+            for d in (start + timedelta(days=i) for i in range(days))
+        ])
 
 
 class ReportLowStockView(APIView):

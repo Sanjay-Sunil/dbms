@@ -112,4 +112,5 @@ export const messAPI = {
 export const reportsAPI = {
   salesByFoodPoint: () => api.get('/reports/sales-by-food-point/'),
   lowStock: () => api.get('/reports/low-stock/'),
+  dailyRevenue: (days = 30) => api.get('/reports/daily-revenue/', { params: { days } }),
 };
