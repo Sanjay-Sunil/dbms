@@ -26,9 +26,10 @@ from .serializers import (
 
 class FoodPointListView(generics.ListAPIView):
     """Public: list all active food points."""
-    queryset = FoodPoint.objects.filter(is_active=True)
+    queryset = FoodPoint.objects.filter(is_active=True).order_by('id')
     serializer_class = FoodPointSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
 
 class FoodPointDetailView(generics.RetrieveAPIView):
@@ -37,12 +38,20 @@ class FoodPointDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+class IngredientListView(generics.ListAPIView):
+    queryset = Ingredient.objects.filter(is_active=True).order_by('ingredient_name')
+    serializer_class = IngredientSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+
 # ── Menu ──────────────────────────────────────────
 
 class MenuItemListView(generics.ListAPIView):
     """Browse menu items, optionally filtered by food_point and category."""
     serializer_class = MenuItemListSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         qs = MenuItem.objects.filter(is_available=True).select_related('food_point')
@@ -82,6 +91,7 @@ class InventoryStockListView(generics.ListAPIView):
     """Staff: view stock levels at a food point."""
     serializer_class = InventoryStockSerializer
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
+    pagination_class = None
 
     def get_queryset(self):
         qs = InventoryStock.objects.select_related('food_point', 'ingredient')
@@ -251,6 +261,7 @@ class StudentMessHistoryView(generics.ListAPIView):
     """Student: view own mess meal history."""
     serializer_class = MessMealRecordSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         return MessMealRecord.objects.filter(

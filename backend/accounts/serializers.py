@@ -27,18 +27,42 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
+    assigned_food_points = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name',
-                  'full_name', 'role', 'student_roll_no', 'phone', 'is_active')
+                  'full_name', 'role', 'student_roll_no', 'phone', 'is_active',
+                  'assigned_food_points')
         read_only_fields = ('id', 'username', 'role')
+
+    def get_assigned_food_points(self, obj):
+        if obj.role == User.Role.STAFF:
+            return [
+                {
+                    'id': a.food_point.id,
+                    'name': a.food_point.name,
+                    'point_type': a.food_point.point_type,
+                    'location_description': a.food_point.location_description
+                }
+                for a in obj.assignments.filter(is_active=True).select_related('food_point')
+            ]
+        return []
 
 
 class UserListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for admin user lists."""
     full_name = serializers.CharField(read_only=True)
+    assigned_food_points = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'full_name', 'role', 'student_roll_no', 'is_active')
+        fields = ('id', 'username', 'email', 'full_name', 'role', 'student_roll_no', 'phone', 'is_active', 'assigned_food_points')
+
+    def get_assigned_food_points(self, obj):
+        if obj.role == User.Role.STAFF:
+            return [
+                {'id': a.food_point.id, 'name': a.food_point.name}
+                for a in obj.assignments.filter(is_active=True).select_related('food_point')
+            ]
+        return []

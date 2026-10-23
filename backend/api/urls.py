@@ -8,9 +8,10 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/', include('accounts.urls')),
 
-    # Food Points
+    # Food Points & Ingredients
     path('food-points/', views.FoodPointListView.as_view(), name='food-point-list'),
     path('food-points/<int:pk>/', views.FoodPointDetailView.as_view(), name='food-point-detail'),
+    path('ingredients/', views.IngredientListView.as_view(), name='ingredient-list'),
 
     # Menu
     path('menu/', views.MenuItemListView.as_view(), name='menu-list'),

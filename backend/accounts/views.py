@@ -27,8 +27,9 @@ class ProfileView(APIView):
 
 
 class UserListView(generics.ListAPIView):
-    """Admin-only: list all users."""
+    """Admin/Staff: list users with optional role filtering."""
     serializer_class = UserListSerializer
+    pagination_class = None
 
     def get_queryset(self):
         qs = User.objects.all().order_by('role', 'username')
@@ -38,7 +39,7 @@ class UserListView(generics.ListAPIView):
         return qs
 
     def get_permissions(self):
-        return [permissions.IsAuthenticated(), IsAdminRole()]
+        return [permissions.IsAuthenticated(), IsStaffRole()]
 
 
 class IsAdminRole(permissions.BasePermission):
