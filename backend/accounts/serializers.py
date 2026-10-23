@@ -11,10 +11,12 @@ class RegisterSerializer(serializers.ModelSerializer):
                   'role', 'student_roll_no', 'phone')
 
     def validate(self, data):
-        if data.get('role') == User.Role.STUDENT and not data.get('student_roll_no'):
+        # Public sign-up is for students only; staff and admins are created by an admin.
+        if data.get('role', User.Role.STUDENT) != User.Role.STUDENT:
+            raise serializers.ValidationError({'role': 'Only student accounts can self-register.'})
+        data['role'] = User.Role.STUDENT
+        if not data.get('student_roll_no'):
             raise serializers.ValidationError({'student_roll_no': 'Required for students.'})
-        if data.get('role') != User.Role.STUDENT:
-            data['student_roll_no'] = None
         return data
 
     def create(self, validated_data):
@@ -34,7 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'first_name', 'last_name',
                   'full_name', 'role', 'student_roll_no', 'phone', 'is_active',
                   'assigned_food_points')
-        read_only_fields = ('id', 'username', 'role')
+        read_only_fields = ('id', 'username', 'role', 'student_roll_no', 'is_active')
 
     def get_assigned_food_points(self, obj):
         if obj.role == User.Role.STAFF:
