@@ -327,6 +327,8 @@ class Command(BaseCommand):
                 ing = Ingredient.objects.get(pk=ing_id)
                 qty = Decimal(str(random.uniform(5, 50))).quantize(Decimal('0.001'))
                 reorder = (qty * Decimal('0.2')).quantize(Decimal('0.001'))
+                if random.random() < 0.15:  # a few items running low, for the low-stock report
+                    qty = (reorder * Decimal('0.6')).quantize(Decimal('0.001'))
                 InventoryStock.objects.get_or_create(
                     food_point=fp, ingredient=ing,
                     defaults={'quantity_on_hand': qty, 'reorder_level': reorder}
