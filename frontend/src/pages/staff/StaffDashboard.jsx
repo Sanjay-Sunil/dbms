@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
-  foodPointAPI, menuAPI, inventoryAPI, salesAPI, messAPI, authAPI, ingredientAPI
+  foodPointAPI, menuAPI, inventoryAPI, salesAPI, messAPI, authAPI, ingredientAPI, errorMessage
 } from '../../api/client';
+import { useToast } from '../../components/Toast';
 import Badge from '../../components/Badge';
 import Modal from '../../components/Modal';
 import {
@@ -12,6 +13,7 @@ import {
 
 export default function StaffDashboard() {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'sales' | 'inventory' | 'mess'
   const [loading, setLoading] = useState(true);
 
@@ -205,7 +207,7 @@ export default function StaffDashboard() {
       // Refresh sales log and inventory stock levels
       loadOutletSpecificData(activeOutlet.id);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to record sale.');
+      toast.error(errorMessage(err, 'Failed to record sale.'));
     } finally {
       setPosSubmitting(false);
     }
@@ -230,6 +232,7 @@ export default function StaffDashboard() {
       });
 
       setIsStockModalOpen(false);
+      toast.success('Stock movement recorded.');
       setStockFormData({
         ingredient_id: '',
         movement_type: 'RESTOCK',
@@ -239,7 +242,7 @@ export default function StaffDashboard() {
       // Refresh inventory
       loadOutletSpecificData(activeOutlet.id);
     } catch (err) {
-      alert('Failed to record stock movement.');
+      toast.error(errorMessage(err, 'Failed to record stock movement.'));
     }
   };
 
@@ -254,9 +257,10 @@ export default function StaffDashboard() {
         notes: newSessionData.notes,
       });
       setIsNewSessionModalOpen(false);
+      toast.success('Meal session created.');
       loadMessSessions(activeOutlet.id);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to create meal session.');
+      toast.error(errorMessage(err, 'Failed to create meal session.'));
     }
   };
 
@@ -277,7 +281,7 @@ export default function StaffDashboard() {
       });
       loadSessionDetail(selectedSessionId);
     } catch (err) {
-      alert(err.response?.data?.non_field_errors?.[0] || 'Already recorded or error occurred.');
+      toast.error(errorMessage(err, 'Already recorded or error occurred.'));
     }
   };
 

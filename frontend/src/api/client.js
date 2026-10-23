@@ -41,6 +41,22 @@ api.interceptors.response.use(
 
 export default api;
 
+/** Turn a DRF error response into one readable message. */
+export function errorMessage(err, fallback = 'Something went wrong.') {
+  const data = err?.response?.data;
+  if (!data) return err?.message ? `${fallback} (${err.message})` : fallback;
+  if (typeof data === 'string') return fallback;
+  if (data.shortages) {
+    return 'Insufficient stock:\n' + data.shortages
+      .map((s) => `• ${s.ingredient}: need ${Number(s.required)} ${s.unit}, have ${Number(s.on_hand)}`)
+      .join('\n');
+  }
+  if (data.detail) return data.detail;
+  if (data.error) return data.error;
+  const first = Object.values(data).flat()[0];
+  return typeof first === 'string' ? first : fallback;
+}
+
 // ── Auth ─────────────────────────────────────────
 export const authAPI = {
   login: (username, password) =>

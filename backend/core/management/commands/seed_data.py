@@ -17,6 +17,14 @@ from sales.models import Sale, SaleItem
 from mess.models import MessMealSession, MessMealRecord
 
 
+# Realistic opening stock per unit of measure (min, max).
+STOCK_RANGE = {
+    'g': (2000, 10000), 'ml': (2000, 10000),
+    'kg': (10, 60), 'L': (10, 60),
+    'piece': (60, 300), 'packet': (20, 80),
+}
+
+
 class Command(BaseCommand):
     help = 'Seed the database with realistic campus food data'
 
@@ -325,7 +333,8 @@ class Command(BaseCommand):
 
             for ing_id in recipe_ings:
                 ing = Ingredient.objects.get(pk=ing_id)
-                qty = Decimal(str(random.uniform(5, 50))).quantize(Decimal('0.001'))
+                low, high = STOCK_RANGE[ing.unit_of_measure]
+                qty = Decimal(str(random.uniform(low, high))).quantize(Decimal('0.001'))
                 reorder = (qty * Decimal('0.2')).quantize(Decimal('0.001'))
                 if random.random() < 0.15:  # a few items running low, for the low-stock report
                     qty = (reorder * Decimal('0.6')).quantize(Decimal('0.001'))

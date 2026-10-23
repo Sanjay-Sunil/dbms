@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import {
-  reportsAPI, foodPointAPI, menuAPI, salesAPI, authAPI, ingredientAPI
+  reportsAPI, foodPointAPI, menuAPI, salesAPI, authAPI, ingredientAPI, errorMessage
 } from '../../api/client';
+import { useToast } from '../../components/Toast';
 import Badge from '../../components/Badge';
 import Modal from '../../components/Modal';
 import {
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'lowstock' | 'sales' | 'menu' | 'users'
   const [loading, setLoading] = useState(true);
 
@@ -122,11 +122,12 @@ export default function AdminDashboard() {
         await menuAPI.create(menuFormData);
       }
       setIsMenuItemModalOpen(false);
+      toast.success(editingItem ? 'Menu item updated.' : 'Menu item created.');
       // Refresh menu
       const res = await menuAPI.list();
       setMenuList(Array.isArray(res.data) ? res.data : res.data?.results || []);
     } catch (err) {
-      alert(err.response?.data?.item_name || 'Failed to save menu item.');
+      toast.error(errorMessage(err, 'Failed to save menu item.'));
     }
   };
 
@@ -135,17 +136,18 @@ export default function AdminDashboard() {
       await menuAPI.update(item.id, { is_available: !item.is_available });
       setMenuList(menuList.map((m) => m.id === item.id ? { ...m, is_available: !m.is_available } : m));
     } catch (err) {
-      alert('Failed to update availability.');
+      toast.error(errorMessage(err, 'Failed to update availability.'));
     }
   };
 
   const handleDeleteMenuItem = async (itemId) => {
-    if (!window.confirm('Are you sure you want to delete this menu item?')) return;
+    if (!(await toast.confirm('Delete this menu item? This cannot be undone.', { confirmLabel: 'Delete', danger: true }))) return;
     try {
       await menuAPI.delete(itemId);
       setMenuList(menuList.filter((m) => m.id !== itemId));
+      toast.success('Menu item deleted.');
     } catch (err) {
-      alert('Failed to delete menu item.');
+      toast.error(errorMessage(err, 'Failed to delete menu item. Items with sales history cannot be deleted — mark them unavailable instead.'));
     }
   };
 
